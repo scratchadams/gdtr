@@ -75,7 +75,10 @@ func PingHost(host string) {
 
     defer syscall.Close(recv)
     defer syscall.Close(send)
-
+    
+    tv := syscall.NsecToTimeval(1000 * 1000 * 200)
+    syscall.SetsockoptTimeval(recv, syscall.SOL_SOCKET, syscall.SO_RCVTIMEO, &tv)
+    
     syscall.Bind(recv, &syscall.SockaddrInet4{Port: 33434, Addr: socketAddr})
     syscall.Sendto(send, []byte{0x0}, 0, &syscall.SockaddrInet4{Port: 33434, Addr: dest_addr})
 
@@ -137,5 +140,5 @@ func main() {
     })
 
     TraceHost("8.8.8.8")
-    PingHost("8.8.8.9")
+    PingHost("8.8.8.8")
 }
