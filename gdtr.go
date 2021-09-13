@@ -82,7 +82,7 @@ func PingHost(host string) {
     syscall.Bind(recv, &syscall.SockaddrInet4{Port: 33434, Addr: socketAddr})
     syscall.Sendto(send, []byte{0x0}, 0, &syscall.SockaddrInet4{Port: 33434, Addr: dest_addr})
 
-    buf := make([]byte, 65536)
+    buf := make([]byte, 1024)
     for {
         n, _, err := syscall.Recvfrom(recv, buf, 0)
         if err != nil {
@@ -96,9 +96,12 @@ func PingHost(host string) {
 }
 
 func TraceHost(host string) {
+    max_hops := 64
+    var hop_list []traceroute.TracerouteHop
+
     options := traceroute.TracerouteOptions{}
     options.SetRetries(2)
-    options.SetMaxHops(64)
+    options.SetMaxHops(max_hops)
     options.SetFirstHop(1)
 
     /*addr, err := net.ResolveIPAddr("ip", host)
@@ -106,22 +109,25 @@ func TraceHost(host string) {
         return
     }*/
 
-    conn := make(chan traceroute.TracerouteHop, 0)
+    c := make(chan traceroute.TracerouteHop, 0)
     go func() {
         for {
-            hop, ok := <-conn
+            hop, ok := <-c
             if !ok {
                 fmt.Println()
                 return
             }
+            hop_list = append(hop_list, hop)
             printHop(hop)
         }
     }()
 
-    _, err := traceroute.Traceroute(host, &options, conn)
+    _, err := traceroute.Traceroute(host, &options, c)
     if err != nil {
         fmt.Printf("Error: ", err)
     }
+
+    fmt.Printf("hops: %#v\n", hop_list[0].Host)
 }
 
 func main() {
