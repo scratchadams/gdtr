@@ -89,13 +89,24 @@ func PingHost(host string) {
             fmt.Println("err")
             continue
         } else {
-            fmt.Printf("buf: ", buf[:n])
+            fmt.Printf("buf: \n", buf[:n])
             return
         }
     }
 }
 
-func TraceHost(host string) {
+func ipString(addr [4]byte) string {
+    return fmt.Sprintf("%v.%v.%v.%v", addr[0], addr[1], addr[2], addr[3])
+}
+
+func PingHops(hop_list []traceroute.TracerouteHop) {
+    for i := 0; i < len(hop_list); i++ {
+        fmt.Println("ping hop %v", i)
+        PingHost(ipString(hop_list[i].Address))
+    }
+}
+
+func TraceHost(host string) []traceroute.TracerouteHop {
     max_hops := 64
     var hop_list []traceroute.TracerouteHop
 
@@ -127,7 +138,7 @@ func TraceHost(host string) {
         fmt.Printf("Error: ", err)
     }
 
-    fmt.Printf("hops: %#v\n", hop_list[0].Host)
+    return hop_list
 }
 
 func main() {
@@ -145,6 +156,8 @@ func main() {
         },
     })
 
-    TraceHost("8.8.8.8")
-    PingHost("8.8.8.8")
+    hop_list := TraceHost("8.8.8.8")
+    PingHops(hop_list)
+
+    fmt.Printf("hop list: %#v\n", hop_list)
 }
