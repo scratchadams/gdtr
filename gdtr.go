@@ -2,6 +2,7 @@ package main
 
 import (
     "fmt"
+    "time"
     "net"
     "syscall"
     "errors"
@@ -71,34 +72,35 @@ func icmpPacket() []byte {
     return icmp
 }
 
-func PingHost(host string) {
+func PingHost(host traceroute.TracerouteHop) traceroute.TracerouteHop {
+    start := time.Now()
+
     sock_addr, err := socketAddr()
     if err != nil {
-        return
+        return host
     }
-    fmt.Println(ipString(sock_addr)) 
 
-    addr_list, err := net.LookupHost(host)
+    addr_list, err := net.LookupHost(ipString(host.Address))
     if err != nil {
-        return
+        return host
     }
     addr := addr_list[0]
 
     ip_addr, err := net.ResolveIPAddr("ip", addr)
     if err != nil {
-        return
+        return host
     }
     var dest_addr [4]byte
     copy(dest_addr[:], ip_addr.IP.To4())
 
     recv, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_ICMP)
     if err != nil {
-        return
+        return host
     }
 
     send, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_ICMP)
     if err != nil {
-        return
+        return host
     }
     
     tv := syscall.NsecToTimeval(1000 * 1000 * 3000)
@@ -117,20 +119,18 @@ func PingHost(host string) {
     
     err = syscall.Sendto(send, icmpPacket(), 0, &syscall.SockaddrInet4{Port: 33439, Addr: dest_addr})
     if err != nil {
-        fmt.Println("here")
         fmt.Println(err)
     }
 
     buf := make([]byte, 2048)
-    for {
-        n, _, err := syscall.Recvfrom(recv, buf, 0)
+    for {        
+        _, _, err := syscall.Recvfrom(recv, buf, 0)
         if err != nil {
-            fmt.Println(err)
-            fmt.Println(host)
-            break
+            host.ElapsedTime = time.Since(start)
+            return host
         } else {
-            fmt.Printf("buf: \n", buf[:n])
-            return
+            host.ElapsedTime = time.Since(start)
+            return host
         }
     }
 }
@@ -142,8 +142,10 @@ func ipString(addr [4]byte) string {
 func PingHops(hop_list []traceroute.TracerouteHop) {
     for i := 0; i < len(hop_list)-1; i++ {
         fmt.Println("ping hop %v", i+1)
-        PingHost(ipString(hop_list[i+1].Address))
+        hop := PingHost(hop_list[i+1])
+        fmt.Println(hop)
     }
+
 }
 
 func TraceHost(host string) []traceroute.TracerouteHop {
@@ -197,8 +199,5 @@ func main() {
     })
 
     hop_list := TraceHost("8.8.8.8")
-    //PingHost("10.0.0.1")
     PingHops(hop_list)
-
-    //fmt.Printf("hop list: %#v\n", hop_list)
 }
