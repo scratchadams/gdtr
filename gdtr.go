@@ -44,11 +44,39 @@ func socketAddr() (addr [4]byte, err error) {
 	return
 }
 
+func checkSum(value []byte) uint16{
+    sum := uint32(0)
+
+    for i, n := 0, len(value); i < n; i+= 2 {
+        sum += uint32(value[i+1] << 8) + uint32(value[i])
+    }
+
+    sum = (sum >> 16) + (sum & 0xffff)
+    sum += (sum >> 16)
+
+    return uint16(^sum)
+}
+
+func icmpPacket() []byte {
+    icmp := []byte {
+        8,0,
+        0,0,
+        0,0,0,0,
+    }
+
+    cs := checkSum(icmp)
+    icmp[2] = byte(cs)
+    icmp[3] = byte(cs >> 8)
+    
+    return icmp
+}
+
 func PingHost(host string) {
-    socketAddr, err := socketAddr()
+    sock_addr, err := socketAddr()
     if err != nil {
         return
     }
+    fmt.Println(ipString(sock_addr)) 
 
     addr_list, err := net.LookupHost(host)
     if err != nil {
@@ -68,26 +96,38 @@ func PingHost(host string) {
         return
     }
 
-    send, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, syscall.IPPROTO_UDP)
+    send, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_ICMP)
     if err != nil {
         return
     }
-
+    
+    tv := syscall.NsecToTimeval(1000 * 1000 * 3000)
+    syscall.SetsockoptTimeval(recv, syscall.SOL_SOCKET, syscall.SO_RCVTIMEO, &tv)
+   
+    syscall.SetsockoptInt(recv, syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
+    syscall.SetsockoptInt(send, syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
+    
     defer syscall.Close(recv)
     defer syscall.Close(send)
-    
-    tv := syscall.NsecToTimeval(1000 * 1000 * 200)
-    syscall.SetsockoptTimeval(recv, syscall.SOL_SOCKET, syscall.SO_RCVTIMEO, &tv)
-    
-    syscall.Bind(recv, &syscall.SockaddrInet4{Port: 33434, Addr: socketAddr})
-    syscall.Sendto(send, []byte{0x0}, 0, &syscall.SockaddrInet4{Port: 33434, Addr: dest_addr})
 
-    buf := make([]byte, 1024)
+    err = syscall.Bind(recv, &syscall.SockaddrInet4{Port: 33436, Addr: sock_addr})
+    if err != nil {
+        fmt.Println(err)
+    }
+    
+    err = syscall.Sendto(send, icmpPacket(), 0, &syscall.SockaddrInet4{Port: 33439, Addr: dest_addr})
+    if err != nil {
+        fmt.Println("here")
+        fmt.Println(err)
+    }
+
+    buf := make([]byte, 2048)
     for {
         n, _, err := syscall.Recvfrom(recv, buf, 0)
         if err != nil {
-            fmt.Println("err")
-            continue
+            fmt.Println(err)
+            fmt.Println(host)
+            break
         } else {
             fmt.Printf("buf: \n", buf[:n])
             return
@@ -100,9 +140,9 @@ func ipString(addr [4]byte) string {
 }
 
 func PingHops(hop_list []traceroute.TracerouteHop) {
-    for i := 0; i < len(hop_list); i++ {
-        fmt.Println("ping hop %v", i)
-        PingHost(ipString(hop_list[i].Address))
+    for i := 0; i < len(hop_list)-1; i++ {
+        fmt.Println("ping hop %v", i+1)
+        PingHost(ipString(hop_list[i+1].Address))
     }
 }
 
@@ -157,7 +197,8 @@ func main() {
     })
 
     hop_list := TraceHost("8.8.8.8")
+    //PingHost("10.0.0.1")
     PingHops(hop_list)
 
-    fmt.Printf("hop list: %#v\n", hop_list)
+    //fmt.Printf("hop list: %#v\n", hop_list)
 }
