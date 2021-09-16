@@ -9,6 +9,7 @@ import (
     "errors"
     "log"
     "encoding/json"
+    "io/ioutil"
     
     "github.com/gorilla/mux"
     "github.com/aeden/traceroute"
@@ -202,6 +203,21 @@ func landingPage(w http.ResponseWriter, r *http.Request) {
     fmt.Println("Endpoint hit...")
 }
 
+func addDestination(w http.ResponseWriter, r *http.Request) {
+    request, _ := ioutil.ReadAll(r.Body)
+    
+    var dest Destination
+    json.Unmarshal(request, &dest)
+
+    _, err := net.ResolveIPAddr("ip", dest.Address)
+    if err != nil {
+        fmt.Fprintf(w, "Incorrect or empty IP Address\n")
+        return
+    }
+
+    fmt.Println(dest)
+}
+
 func listDestinations(w http.ResponseWriter, r *http.Request) {
     fmt.Println("endpoint hit: listDestinations")
     json.NewEncoder(w).Encode(dest_info)
@@ -212,6 +228,7 @@ func handleRequests() {
 
     route.HandleFunc("/", landingPage)
     route.HandleFunc("/dest", listDestinations)
+    route.HandleFunc("/add_dest", addDestination).Methods("POST")
 
     log.Fatal(http.ListenAndServe(":10001", route))
 }
