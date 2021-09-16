@@ -4,11 +4,25 @@ import (
     "fmt"
     "time"
     "net"
+    "net/http"
     "syscall"
     "errors"
+    "log"
+    "encoding/json"
+    
+    "github.com/gorilla/mux"
     "github.com/aeden/traceroute"
     "github.com/pyroscope-io/pyroscope/pkg/agent/profiler"
 )
+
+type Destination struct {
+    Address string `json:"address"`
+    Mode string `json:"mode"`
+    Interval int `json:"interval"`
+}
+
+var dest_info []Destination
+
 
 func printHop(hop traceroute.TracerouteHop) {
     addr := fmt.Sprintf("%v.%v.%v.%v", hop.Address[0], hop.Address[1], hop.Address[2], hop.Address[3])
@@ -183,6 +197,25 @@ func TraceHost(host string) []traceroute.TracerouteHop {
     return hop_list
 }
 
+func landingPage(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "Hi")
+    fmt.Println("Endpoint hit...")
+}
+
+func listDestinations(w http.ResponseWriter, r *http.Request) {
+    fmt.Println("endpoint hit: listDestinations")
+    json.NewEncoder(w).Encode(dest_info)
+}
+
+func handleRequests() {
+    route := mux.NewRouter().StrictSlash(true)
+
+    route.HandleFunc("/", landingPage)
+    route.HandleFunc("/dest", listDestinations)
+
+    log.Fatal(http.ListenAndServe(":10001", route))
+}
+
 func main() {
 
     profiler.Start(profiler.Config{
@@ -198,6 +231,11 @@ func main() {
         },
     })
 
-    hop_list := TraceHost("8.8.8.8")
-    PingHops(hop_list)
+    dest_info = []Destination {
+        Destination{Address: "8.8.8.8", Mode: "Monitor", Interval: 10000},
+    }
+
+    handleRequests()
+    //hop_list := TraceHost("8.8.8.8")
+    //PingHops(hop_list)
 }
