@@ -20,7 +20,7 @@ import (
 type Destination struct {
     Address string `json:"address"`
     Mode string `json:"mode"`
-    Interval int `json:"interval"`
+    Interval int64 `json:"interval"`
 }
 
 type Hop_Struct struct {
@@ -182,6 +182,8 @@ func TraceHost(host string) []traceroute.TracerouteHop {
     if err != nil {
         return
     }*/
+    
+    fmt.Printf("Tracing host: %v\n", host)
 
     c := make(chan traceroute.TracerouteHop, 0)
     go func() {
@@ -266,7 +268,7 @@ func checkHopList(host string) int {
 
 }
 
-func destPoller() {
+func destPoller(delay int64) {
     var wg sync.WaitGroup
 
     for i := 0; i < len(dest_info); i++ {
@@ -282,6 +284,12 @@ func destPoller() {
         wg.Add(1)
         go func() {
             defer wg.Done()
+            start := time.Now()
+
+            for duration := time.Since(start); duration.Milliseconds() < delay; {
+                duration = time.Since(start)
+            }
+
             PingHops(global_hop_struct[i].hop_list)
         }()
     }
@@ -316,7 +324,7 @@ func main() {
     }()
    
     for {
-        destPoller()
+        destPoller(5000)
     }
 
     wg.Wait()
