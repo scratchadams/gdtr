@@ -8,6 +8,7 @@ import (
     "syscall"
     "errors"
     "log"
+    "sync"
     "encoding/json"
     "io/ioutil"
     
@@ -22,8 +23,13 @@ type Destination struct {
     Interval int `json:"interval"`
 }
 
-var dest_info []Destination
+type Hop_Struct struct {
+    hop_list []traceroute.TracerouteHop
+    host string
+}
 
+var dest_info []Destination
+var global_hop_struct []Hop_Struct
 
 func printHop(hop traceroute.TracerouteHop) {
     addr := fmt.Sprintf("%v.%v.%v.%v", hop.Address[0], hop.Address[1], hop.Address[2], hop.Address[3])
@@ -215,6 +221,16 @@ func addDestination(w http.ResponseWriter, r *http.Request) {
         return
     }
 
+    if dest.Mode != "monitor" {
+        fmt.Fprintf(w, "Monitor mode only supported\n")
+        return
+    }
+
+    if dest.Interval < 1 {
+        dest.Interval = 10000
+    }
+
+    dest_info = append(dest_info, dest)
     fmt.Println(dest)
 }
 
@@ -231,6 +247,45 @@ func handleRequests() {
     route.HandleFunc("/add_dest", addDestination).Methods("POST")
 
     log.Fatal(http.ListenAndServe(":10001", route))
+}
+
+func checkHopList(host string) int {
+    var hop_struct Hop_Struct
+
+    for i := 0; i < len(global_hop_struct); i++ {
+        if global_hop_struct[i].host == host {
+            return 0
+        }
+    }
+    
+    hop_struct.host = host
+    hop_struct.hop_list = TraceHost(host)
+
+    global_hop_struct = append(global_hop_struct, hop_struct)
+    return 1
+
+}
+
+func destPoller() {
+    var wg sync.WaitGroup
+
+    for i := 0; i < len(dest_info); i++ {
+        
+        n := checkHopList(dest_info[i].Address)
+        if n == 1 {
+            fmt.Println("Hop List Updated")
+            fmt.Println(global_hop_struct)
+        }
+    }
+
+    for i := 0; i < len(global_hop_struct)-1; i++ {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            PingHops(global_hop_struct[i].hop_list)
+        }()
+    }
+    wg.Wait()
 }
 
 func main() {
@@ -252,7 +307,19 @@ func main() {
         Destination{Address: "8.8.8.8", Mode: "Monitor", Interval: 10000},
     }
 
-    handleRequests()
+    var wg sync.WaitGroup
+    wg.Add(1)
+
+    go func() {
+        defer wg.Done()
+        handleRequests()
+    }()
+   
+    for {
+        destPoller()
+    }
+
+    wg.Wait()
     //hop_list := TraceHost("8.8.8.8")
     //PingHops(hop_list)
 }
