@@ -25,6 +25,7 @@ type Destination struct {
 
 type Hop_Struct struct {
     hop_list []traceroute.TracerouteHop
+    response_time [][]int64
     host string
 }
 
@@ -95,6 +96,7 @@ func icmpPacket() []byte {
 
 func PingHost(host traceroute.TracerouteHop) traceroute.TracerouteHop {
     start := time.Now()
+    host.ElapsedTime = 0
 
     sock_addr, err := socketAddr()
     if err != nil {
@@ -160,12 +162,18 @@ func ipString(addr [4]byte) string {
     return fmt.Sprintf("%v.%v.%v.%v", addr[0], addr[1], addr[2], addr[3])
 }
 
-func PingHops(hop_list []traceroute.TracerouteHop) {
+func PingHops(hop_list []traceroute.TracerouteHop) []int64 {
+    var ping_times []int64
+
     for i := 0; i < len(hop_list)-1; i++ {
         fmt.Println("ping hop %v", i+1)
         hop := PingHost(hop_list[i+1])
+        
+        ping_times = append(ping_times, hop.ElapsedTime.Milliseconds())
         fmt.Println(hop)
     }
+
+    return ping_times
 
 }
 
@@ -290,7 +298,8 @@ func destPoller(delay int64) {
                 duration = time.Since(start)
             }
 
-            PingHops(global_hop_struct[i].hop_list)
+            ping_times := PingHops(global_hop_struct[i].hop_list)
+            global_hop_struct[i].response_time = append(global_hop_struct[i].response_time, ping_times)
         }()
     }
     wg.Wait()
