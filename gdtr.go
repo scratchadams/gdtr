@@ -249,11 +249,18 @@ func listDestinations(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(dest_info)
 }
 
+func printGHS(w http.ResponseWriter, r *http.Request) {
+    fmt.Println("endpoint hit: printGHS")
+    fmt.Printf("ghs: %#v\n", global_hop_struct)
+    json.NewEncoder(w).Encode(global_hop_struct[0].hop_list)
+}
+
 func handleRequests() {
     route := mux.NewRouter().StrictSlash(true)
 
     route.HandleFunc("/", landingPage)
     route.HandleFunc("/dest", listDestinations)
+    route.HandleFunc("/ghs", printGHS)
     route.HandleFunc("/add_dest", addDestination).Methods("POST")
 
     log.Fatal(http.ListenAndServe(":10001", route))
@@ -270,6 +277,9 @@ func checkHopList(host string) int {
     
     hop_struct.host = host
     hop_struct.hop_list = TraceHost(host)
+    
+    ping_times := PingHops(hop_struct.hop_list)
+    hop_struct.response_time = append(hop_struct.response_time, ping_times)
 
     global_hop_struct = append(global_hop_struct, hop_struct)
     return 1
@@ -288,7 +298,7 @@ func destPoller(delay int64) {
         }
     }
 
-    for i := 0; i < len(global_hop_struct)-1; i++ {
+    for i := 0; i < len(global_hop_struct)-1; i++ {               
         wg.Add(1)
         go func() {
             defer wg.Done()
