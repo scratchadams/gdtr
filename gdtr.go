@@ -24,9 +24,9 @@ type Destination struct {
 }
 
 type Hop_Struct struct {
-    hop_list []traceroute.TracerouteHop
-    response_time [][]int64
-    host string
+    Hop_list []traceroute.TracerouteHop
+    Response_time [][]int64
+    Host string
 }
 
 var dest_info []Destination
@@ -170,7 +170,7 @@ func PingHops(hop_list []traceroute.TracerouteHop) []int64 {
         hop := PingHost(hop_list[i+1])
         
         ping_times = append(ping_times, hop.ElapsedTime.Milliseconds())
-        fmt.Println(hop)
+        fmt.Printf("Time stamp: %v", time.Now().Unix())
     }
 
     return ping_times
@@ -252,7 +252,8 @@ func listDestinations(w http.ResponseWriter, r *http.Request) {
 func printGHS(w http.ResponseWriter, r *http.Request) {
     fmt.Println("endpoint hit: printGHS")
     fmt.Printf("ghs: %#v\n", global_hop_struct)
-    json.NewEncoder(w).Encode(global_hop_struct[0].hop_list)
+
+    json.NewEncoder(w).Encode(global_hop_struct)
 }
 
 func handleRequests() {
@@ -270,16 +271,16 @@ func checkHopList(host string) int {
     var hop_struct Hop_Struct
 
     for i := 0; i < len(global_hop_struct); i++ {
-        if global_hop_struct[i].host == host {
+        if global_hop_struct[i].Host == host {
             return 0
         }
     }
     
-    hop_struct.host = host
-    hop_struct.hop_list = TraceHost(host)
+    hop_struct.Host = host
+    hop_struct.Hop_list = TraceHost(host)
     
-    ping_times := PingHops(hop_struct.hop_list)
-    hop_struct.response_time = append(hop_struct.response_time, ping_times)
+    ping_times := PingHops(hop_struct.Hop_list)
+    hop_struct.Response_time = append(hop_struct.Response_time, ping_times)
 
     global_hop_struct = append(global_hop_struct, hop_struct)
     return 1
@@ -308,8 +309,8 @@ func destPoller(delay int64) {
                 duration = time.Since(start)
             }
 
-            ping_times := PingHops(global_hop_struct[i].hop_list)
-            global_hop_struct[i].response_time = append(global_hop_struct[i].response_time, ping_times)
+            ping_times := PingHops(global_hop_struct[i].Hop_list)
+            global_hop_struct[i].Response_time = append(global_hop_struct[i].Response_time, ping_times)
         }()
     }
     wg.Wait()
