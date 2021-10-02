@@ -67,10 +67,15 @@ func writePollData(hop_struct []Hop_Struct) {
 
             for k := 0; k < len(hop_struct[i].Response_time[j]); k++ {
 
-                
+                ip_string := fmt.Sprintf("%v.%v.%v.%v", 
+                    hop_struct[i].Hop_list[k].Address[0],
+                    hop_struct[i].Hop_list[k].Address[1],
+                    hop_struct[i].Hop_list[k].Address[2],
+                    hop_struct[i].Hop_list[k].Address[3])
+
                 p := influxdb2.NewPoint(hop_struct[i].Host,
                     map[string]string{
-                        "Hop": fmt.Sprintf("%v", hop_struct[i].Hop_list[k].Host),
+                        "Hop": ip_string,
                     },
                     map[string]interface{}{
                         "Response Time": hop_struct[i].Response_time[j][k],
