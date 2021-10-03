@@ -79,6 +79,7 @@ func writePollData(hop_struct []Hop_Struct) {
                     },
                     map[string]interface{}{
                         "Response Time": hop_struct[i].Response_time[j][k],
+                        "TTL": hop_struct[i].Hop_list[k].TTL,
                     },
                     time.Unix(hop_struct[i].Time_stamp[j], 0))
             
