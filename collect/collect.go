@@ -75,7 +75,8 @@ func writePollData(hop_struct []Hop_Struct) {
 
                 p := influxdb2.NewPoint(hop_struct[i].Host,
                     map[string]string{
-                        "Hop": ip_string,
+                        "IP Address": ip_string,
+                        "Host": hop_struct[i].Hop_list[k].Host,
                     },
                     map[string]interface{}{
                         "Response Time": hop_struct[i].Response_time[j][k],
